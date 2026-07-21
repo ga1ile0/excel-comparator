@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.poi.ss.usermodel.Workbook;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -37,4 +39,18 @@ public class WorkbookComparisonResult {
      * Write this to a file with {@code workbook.write(outputStream)}.
      */
     private final Workbook resultWorkbook;
+
+    /**
+     * Serializes the result workbook to a byte array suitable for Allure attachments.
+     * The workbook is NOT closed after this call.
+     */
+    public byte[] toBytes() {
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            resultWorkbook.write(bos);
+            return bos.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to serialize result workbook", e);
+        }
+    }
 }
