@@ -1,0 +1,8 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Excel Export Tests" data-provider-thread-count="20">
+    <test name="Export Verification">
+        <classes>
+            <class name="com.example.testing.ExcelExportIT"/>
+        </classes>
+    </test>
+</suite>
