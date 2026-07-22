@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Predicate;
 
 /**
  * Spring service facade for workbook comparison.
@@ -29,8 +30,22 @@ public class ExcelCompareService {
      */
     public WorkbookComparisonResult compareAndWrite(
             Path file1, Path file2, Path resultPath) throws IOException {
+        return compareAndWrite(file1, file2, resultPath, WorkbookComparator.EXCLUDE_NONE);
+    }
 
-        WorkbookComparisonResult result = workbookComparator.compare(file1, file2);
+    /**
+     * Compare two .xlsx files on disk, skipping any cell pair for which {@code exclusionFilter}
+     * returns {@code true}, and write the annotated diff workbook to {@code resultPath}.
+     *
+     * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
+     *                        skip the cell pair
+     * @return the comparison result
+     */
+    public WorkbookComparisonResult compareAndWrite(
+            Path file1, Path file2, Path resultPath,
+            Predicate<CellContext> exclusionFilter) throws IOException {
+
+        WorkbookComparisonResult result = workbookComparator.compare(file1, file2, exclusionFilter);
 
         try (OutputStream os = Files.newOutputStream(resultPath)) {
             result.getResultWorkbook().write(os);
@@ -52,6 +67,18 @@ public class ExcelCompareService {
      */
     public WorkbookComparisonResult compare(Path file1, Path file2) throws IOException {
         return workbookComparator.compare(file1, file2);
+    }
+
+    /**
+     * Compare two files, skipping any cell pair for which {@code exclusionFilter} returns
+     * {@code true}. The caller is responsible for writing and closing the result workbook.
+     *
+     * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
+     *                        skip the cell pair
+     */
+    public WorkbookComparisonResult compare(Path file1, Path file2,
+            Predicate<CellContext> exclusionFilter) throws IOException {
+        return workbookComparator.compare(file1, file2, exclusionFilter);
     }
 
     /**
