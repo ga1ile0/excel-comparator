@@ -16,14 +16,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
+
+
 /**
  * Compares two Excel workbooks (.xlsx) sheet-by-sheet, cell-by-cell,
  * covering both cell values and all formatting attributes.
  *
+ * <p>Every {@code compare} overload requires an {@code exclusionFilter} predicate.
+ * Pass {@link #EXCLUDE_NONE} when no cells should be skipped.
+ *
  * <p>Usage:
  * <pre>{@code
- * WorkbookComparisonResult result = workbookComparator.compare(path1, path2);
- * result.getResultWorkbook().write(new FileOutputStream("diff.xlsx"));
+ * WorkbookComparisonResult result = workbookComparator.compare(path1, path2, EXCLUDE_NONE);
+ * result.saveToFile(Paths.get("diff.xlsx"));
  * }</pre>
  */
 @Slf4j
@@ -38,14 +43,9 @@ public class WorkbookComparator {
 
     // Public entry points
 
-    public WorkbookComparisonResult compare(Path file1, Path file2) throws IOException {
-        return compare(file1, file2, EXCLUDE_NONE);
-    }
-
     /**
-     * Compare two workbooks, skipping any cell pair for which {@code exclusionFilter} returns
-     * {@code true}. Excluded cells produce no {@link CellDifference} and are not highlighted in
-     * the result workbook.
+     * Compare two workbooks on disk, skipping any cell pair for which {@code exclusionFilter}
+     * returns {@code true}. Pass {@link #EXCLUDE_NONE} to compare all cells.
      *
      * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
      *                        skip the cell pair
@@ -60,13 +60,29 @@ public class WorkbookComparator {
         }
     }
 
-    public WorkbookComparisonResult compare(InputStream is1, InputStream is2) throws IOException {
-        return compare(is1, is2, EXCLUDE_NONE);
+    /**
+     * Compare a workbook on disk ({@code file1}, used as the base for the result workbook) with
+     * a workbook supplied as a raw byte array ({@code file2Bytes}, e.g. downloaded from an
+     * endpoint). Skips any cell pair for which {@code exclusionFilter} returns {@code true}.
+     * Pass {@link #EXCLUDE_NONE} to compare all cells.
+     *
+     * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
+     *                        skip the cell pair
+     */
+    public WorkbookComparisonResult compare(Path file1, byte[] file2Bytes,
+            Predicate<CellContext> exclusionFilter) throws IOException {
+        try (InputStream is1 = Files.newInputStream(file1);
+             InputStream is2 = new ByteArrayInputStream(file2Bytes);
+             Workbook wb1 = WorkbookFactory.create(is1);
+             Workbook wb2 = WorkbookFactory.create(is2)) {
+            return compareWorkbooks(wb1, wb2, exclusionFilter);
+        }
     }
 
     /**
      * Compare two workbooks from streams, skipping any cell pair for which
-     * {@code exclusionFilter} returns {@code true}.
+     * {@code exclusionFilter} returns {@code true}. Pass {@link #EXCLUDE_NONE} to compare all
+     * cells.
      *
      * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
      *                        skip the cell pair

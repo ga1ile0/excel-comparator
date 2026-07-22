@@ -7,6 +7,9 @@ import org.apache.poi.ss.usermodel.Workbook;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -51,6 +54,19 @@ public class WorkbookComparisonResult {
             return bos.toByteArray();
         } catch (IOException e) {
             throw new IllegalStateException("Failed to serialize result workbook", e);
+        }
+    }
+
+    /**
+     * Writes the result workbook to {@code path} as an {@code .xlsx} file and closes the
+     * workbook.
+     *
+     * @param path target file path (will be created or overwritten)
+     */
+    public void saveToFile(Path path) throws IOException {
+        try (OutputStream os = Files.newOutputStream(path);
+             Workbook wb = resultWorkbook) {
+            wb.write(os);
         }
     }
 }
