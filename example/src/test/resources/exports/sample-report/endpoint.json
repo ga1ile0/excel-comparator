@@ -1,0 +1,7 @@
+{
+  "method": "GET",
+  "url": "/api/exports/sample-report",
+  "excludeCells": [
+    { "sheet": 0, "row": 0, "col": 5 }
+  ]
+}
