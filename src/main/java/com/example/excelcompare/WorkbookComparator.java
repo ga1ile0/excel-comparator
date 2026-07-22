@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Compares two Excel workbooks (.xlsx) sheet-by-sheet, cell-by-cell,
@@ -32,27 +33,56 @@ public class WorkbookComparator {
 
     private static final byte[] DIFF_COLOR_RGB = new byte[]{(byte) 0xFF, 0x00, 0x00};
 
+    /** Predicate that excludes no cells — used as the default when no filter is supplied. */
+    static final Predicate<CellContext> EXCLUDE_NONE = ctx -> false;
+
     // Public entry points
 
     public WorkbookComparisonResult compare(Path file1, Path file2) throws IOException {
+        return compare(file1, file2, EXCLUDE_NONE);
+    }
+
+    /**
+     * Compare two workbooks, skipping any cell pair for which {@code exclusionFilter} returns
+     * {@code true}. Excluded cells produce no {@link CellDifference} and are not highlighted in
+     * the result workbook.
+     *
+     * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
+     *                        skip the cell pair
+     */
+    public WorkbookComparisonResult compare(Path file1, Path file2,
+            Predicate<CellContext> exclusionFilter) throws IOException {
         try (InputStream is1 = Files.newInputStream(file1);
              InputStream is2 = Files.newInputStream(file2);
              Workbook wb1 = WorkbookFactory.create(is1);
              Workbook wb2 = WorkbookFactory.create(is2)) {
-            return compareWorkbooks(wb1, wb2);
+            return compareWorkbooks(wb1, wb2, exclusionFilter);
         }
     }
 
     public WorkbookComparisonResult compare(InputStream is1, InputStream is2) throws IOException {
+        return compare(is1, is2, EXCLUDE_NONE);
+    }
+
+    /**
+     * Compare two workbooks from streams, skipping any cell pair for which
+     * {@code exclusionFilter} returns {@code true}.
+     *
+     * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
+     *                        skip the cell pair
+     */
+    public WorkbookComparisonResult compare(InputStream is1, InputStream is2,
+            Predicate<CellContext> exclusionFilter) throws IOException {
         try (Workbook wb1 = WorkbookFactory.create(is1);
              Workbook wb2 = WorkbookFactory.create(is2)) {
-            return compareWorkbooks(wb1, wb2);
+            return compareWorkbooks(wb1, wb2, exclusionFilter);
         }
     }
 
     // Core comparison
 
-    private WorkbookComparisonResult compareWorkbooks(Workbook wb1, Workbook wb2) {
+    private WorkbookComparisonResult compareWorkbooks(Workbook wb1, Workbook wb2,
+            Predicate<CellContext> exclusionFilter) {
         List<CellDifference> cellDiffs       = new ArrayList<>();
         List<String>         structuralDiffs = new ArrayList<>();
 
@@ -77,7 +107,8 @@ public class WorkbookComparator {
                         si, sheet1.getSheetName(), sheet2.getSheetName()));
             }
 
-            compareSheet(wb1, wb2, sheet1, sheet2, resultSheet, si, cellDiffs, structuralDiffs);
+            compareSheet(wb1, wb2, sheet1, sheet2, resultSheet, si, cellDiffs, structuralDiffs,
+                    exclusionFilter);
         }
 
         for (int si = sheetsToCompare; si < sheets1; si++) {
@@ -104,7 +135,8 @@ public class WorkbookComparator {
             Sheet sheet1, Sheet sheet2, Sheet resultSheet,
             int sheetIndex,
             List<CellDifference> cellDiffs,
-            List<String> structuralDiffs) {
+            List<String> structuralDiffs,
+            Predicate<CellContext> exclusionFilter) {
 
         int lastRow = Math.max(lastRowNum(sheet1), lastRowNum(sheet2));
 
@@ -117,6 +149,13 @@ public class WorkbookComparator {
             for (int ci = 0; ci <= lastCol; ci++) {
                 Cell cell1 = getCell(row1, ci);
                 Cell cell2 = getCell(row2, ci);
+
+                CellContext ctx = new CellContext(
+                        sheetIndex, sheet1.getSheetName(), ri, ci,
+                        extractValue(cell1), extractValue(cell2));
+                if (exclusionFilter.test(ctx)) {
+                    continue;
+                }
 
                 CellDifference diff = compareCell(
                         wb1, wb2, cell1, cell2, sheetIndex, sheet1.getSheetName(), ri, ci);
