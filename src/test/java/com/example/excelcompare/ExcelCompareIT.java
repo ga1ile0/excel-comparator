@@ -37,7 +37,8 @@ public class ExcelCompareIT {
                     .as("Expected file not found on classpath")
                     .isNotNull();
 
-            WorkbookComparisonResult result = workbookComparator.compare(actual, expected);
+            WorkbookComparisonResult result = workbookComparator.compare(actual, expected,
+                    WorkbookComparator.EXCLUDE_NONE);
 
             if (!result.isIdentical()) {
                 attachDiffWorkbook(result.toBytes());

@@ -39,7 +39,7 @@ public class ExcelCompareController {
 
         try (var is1 = file1.getInputStream();
              var is2 = file2.getInputStream()) {
-            result = excelCompareService.compare(is1, is2);
+            result = excelCompareService.compare(is1, is2, WorkbookComparator.EXCLUDE_NONE);
         }
 
         excelCompareService.logSummary(result);

@@ -5,8 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.function.Predicate;
 
@@ -22,20 +21,9 @@ public class ExcelCompareService {
     private final WorkbookComparator workbookComparator;
 
     /**
-     * Compare two .xlsx files on disk and write the annotated diff workbook
-     * to {@code resultPath}.
-     *
-     * @return the comparison result; call {@link WorkbookComparisonResult#isIdentical()}
-     *         for a quick check
-     */
-    public WorkbookComparisonResult compareAndWrite(
-            Path file1, Path file2, Path resultPath) throws IOException {
-        return compareAndWrite(file1, file2, resultPath, WorkbookComparator.EXCLUDE_NONE);
-    }
-
-    /**
      * Compare two .xlsx files on disk, skipping any cell pair for which {@code exclusionFilter}
      * returns {@code true}, and write the annotated diff workbook to {@code resultPath}.
+     * Pass {@link WorkbookComparator#EXCLUDE_NONE} to compare all cells.
      *
      * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
      *                        skip the cell pair
@@ -46,12 +34,7 @@ public class ExcelCompareService {
             Predicate<CellContext> exclusionFilter) throws IOException {
 
         WorkbookComparisonResult result = workbookComparator.compare(file1, file2, exclusionFilter);
-
-        try (OutputStream os = Files.newOutputStream(resultPath)) {
-            result.getResultWorkbook().write(os);
-        } finally {
-            result.getResultWorkbook().close();
-        }
+        result.saveToFile(resultPath);
 
         log.info("Comparison complete. Identical: {}. Cell differences: {}. Written to: {}",
                 result.isIdentical(),
@@ -62,16 +45,9 @@ public class ExcelCompareService {
     }
 
     /**
-     * Compare two files and return the result. The caller is responsible for
-     * writing and closing the result workbook.
-     */
-    public WorkbookComparisonResult compare(Path file1, Path file2) throws IOException {
-        return workbookComparator.compare(file1, file2);
-    }
-
-    /**
-     * Compare two files, skipping any cell pair for which {@code exclusionFilter} returns
-     * {@code true}. The caller is responsible for writing and closing the result workbook.
+     * Compare two .xlsx files and return the result. The caller is responsible for closing the
+     * result workbook.
+     * Pass {@link WorkbookComparator#EXCLUDE_NONE} to compare all cells.
      *
      * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
      *                        skip the cell pair
@@ -79,6 +55,31 @@ public class ExcelCompareService {
     public WorkbookComparisonResult compare(Path file1, Path file2,
             Predicate<CellContext> exclusionFilter) throws IOException {
         return workbookComparator.compare(file1, file2, exclusionFilter);
+    }
+
+    /**
+     * Compare a workbook on disk ({@code file1}) with one supplied as raw bytes ({@code file2Bytes},
+     * e.g. downloaded from an endpoint). The caller is responsible for closing the result workbook.
+     * Pass {@link WorkbookComparator#EXCLUDE_NONE} to compare all cells.
+     *
+     * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
+     *                        skip the cell pair
+     */
+    public WorkbookComparisonResult compare(Path file1, byte[] file2Bytes,
+            Predicate<CellContext> exclusionFilter) throws IOException {
+        return workbookComparator.compare(file1, file2Bytes, exclusionFilter);
+    }
+
+    /**
+     * Compare two workbooks from streams. The caller is responsible for closing the result
+     * workbook. Pass {@link WorkbookComparator#EXCLUDE_NONE} to compare all cells.
+     *
+     * @param exclusionFilter predicate receiving a {@link CellContext}; return {@code true} to
+     *                        skip the cell pair
+     */
+    public WorkbookComparisonResult compare(InputStream is1, InputStream is2,
+            Predicate<CellContext> exclusionFilter) throws IOException {
+        return workbookComparator.compare(is1, is2, exclusionFilter);
     }
 
     /**
