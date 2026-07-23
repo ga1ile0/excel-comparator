@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -182,6 +183,46 @@ public class WorkbookComparator {
                 }
             }
         }
+        compareImages(sheet1, sheet2, sheetIndex, structuralDiffs);
+    }
+
+    // Image comparison
+
+    private void compareImages(Sheet sheet1, Sheet sheet2, int sheetIndex,
+            List<String> structuralDiffs) {
+        List<XSSFClientAnchor> anchors1 = getPictureAnchors((XSSFSheet) sheet1);
+        List<XSSFClientAnchor> anchors2 = getPictureAnchors((XSSFSheet) sheet2);
+
+        if (anchors1.size() != anchors2.size()) {
+            structuralDiffs.add(String.format(
+                    "Sheet %d ('%s') image count differs: %d vs %d",
+                    sheetIndex, sheet1.getSheetName(), anchors1.size(), anchors2.size()));
+            return;
+        }
+
+        for (int i = 0; i < anchors1.size(); i++) {
+            XSSFClientAnchor a1 = anchors1.get(i);
+            XSSFClientAnchor a2 = anchors2.get(i);
+            if (a1.getRow1() != a2.getRow1() || a1.getCol1() != a2.getCol1()) {
+                structuralDiffs.add(String.format(
+                        "Sheet %d ('%s') image %d anchor differs: "
+                        + "row=%d,col=%d vs row=%d,col=%d",
+                        sheetIndex, sheet1.getSheetName(), i,
+                        a1.getRow1(), a1.getCol1(),
+                        a2.getRow1(), a2.getCol1()));
+            }
+        }
+    }
+
+    private List<XSSFClientAnchor> getPictureAnchors(XSSFSheet sheet) {
+        XSSFDrawing drawing = sheet.getDrawingPatriarch();
+        if (drawing == null) return List.of();
+        return drawing.getShapes().stream()
+                .filter(s -> s instanceof XSSFPicture)
+                .map(s -> (XSSFClientAnchor) ((XSSFPicture) s).getAnchor())
+                .sorted(Comparator.comparingInt(XSSFClientAnchor::getRow1)
+                                  .thenComparingInt(XSSFClientAnchor::getCol1))
+                .toList();
     }
 
     // Cell-level comparison
